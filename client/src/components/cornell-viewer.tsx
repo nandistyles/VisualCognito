@@ -12,83 +12,116 @@ interface CornellViewerProps {
 export default function CornellViewer({ data }: CornellViewerProps) {
   const handleExport = () => {
     const doc = new jsPDF();
+    const pageWidth = doc.internal.pageSize.width;
     const pageHeight = doc.internal.pageSize.height;
     const marginTop = 20;
-    const marginBottom = 20;
+    const marginBottom = 25;
+    const marginLeft = 20;
+    const marginRight = 20;
     const lineHeight = 7;
+    const sectionSpacing = 10;
     let yPos = marginTop;
+    let pageNumber = 1;
+    
+    const addPageNumber = () => {
+      doc.setFontSize(9);
+      doc.setTextColor(128);
+      doc.text(`Page ${pageNumber}`, pageWidth - marginRight - 10, pageHeight - 10);
+      doc.setTextColor(0);
+      pageNumber++;
+    };
+    
+    const checkPageBreak = (additionalSpace = 0) => {
+      if (yPos + additionalSpace > pageHeight - marginBottom) {
+        addPageNumber();
+        doc.addPage();
+        yPos = marginTop;
+        return true;
+      }
+      return false;
+    };
     
     // Title
-    doc.setFontSize(16);
-    doc.text("Cornell Notes", 20, yPos);
+    doc.setFontSize(18);
+    doc.setFont(undefined, "bold");
+    doc.text("Cornell Notes", marginLeft, yPos);
     yPos += 15;
     
-    // Cues section
-    doc.setFontSize(12);
-    doc.setFont(undefined, "bold");
-    doc.text("Cues:", 20, yPos);
-    yPos += lineHeight;
+    // Add a horizontal line
+    doc.setLineWidth(0.5);
+    doc.line(marginLeft, yPos, pageWidth - marginRight, yPos);
+    yPos += 10;
     
+    // Cues section
+    doc.setFontSize(14);
+    doc.setFont(undefined, "bold");
+    checkPageBreak(lineHeight * 2);
+    doc.text("Cues & Questions", marginLeft, yPos);
+    yPos += lineHeight + 2;
+    
+    doc.setFontSize(11);
     doc.setFont(undefined, "normal");
-    const cuesLines = doc.splitTextToSize(data.cues, 60);
+    const cuesWidth = 60;
+    const cuesLines = doc.splitTextToSize(data.cues, cuesWidth);
+    
     for (let i = 0; i < cuesLines.length; i++) {
-      if (yPos > pageHeight - marginBottom) {
-        doc.addPage();
-        yPos = marginTop;
-      }
-      doc.text(cuesLines[i], 20, yPos);
+      checkPageBreak(lineHeight);
+      doc.text(cuesLines[i], marginLeft, yPos);
       yPos += lineHeight;
     }
     
-    yPos += 5;
+    yPos += sectionSpacing;
     
     // Notes section
+    doc.setFontSize(14);
     doc.setFont(undefined, "bold");
-    if (yPos > pageHeight - marginBottom) {
-      doc.addPage();
-      yPos = marginTop;
-    }
-    doc.text("Notes:", 20, yPos);
-    yPos += lineHeight;
+    checkPageBreak(lineHeight * 2);
+    doc.text("Main Notes", marginLeft, yPos);
+    yPos += lineHeight + 2;
     
+    doc.setFontSize(11);
     doc.setFont(undefined, "normal");
-    const notesLines = doc.splitTextToSize(data.notes, 170);
+    const notesWidth = pageWidth - marginLeft - marginRight;
+    const notesLines = doc.splitTextToSize(data.notes, notesWidth);
+    
     for (let i = 0; i < notesLines.length; i++) {
-      if (yPos > pageHeight - marginBottom) {
-        doc.addPage();
-        yPos = marginTop;
-      }
-      doc.text(notesLines[i], 20, yPos);
+      checkPageBreak(lineHeight);
+      doc.text(notesLines[i], marginLeft, yPos);
       yPos += lineHeight;
     }
     
-    yPos += 5;
+    yPos += sectionSpacing;
     
-    // Summary section
+    // Summary section with visual separation
+    checkPageBreak(lineHeight * 3);
+    doc.setLineWidth(0.3);
+    doc.line(marginLeft, yPos, pageWidth - marginRight, yPos);
+    yPos += 8;
+    
+    doc.setFontSize(14);
     doc.setFont(undefined, "bold");
-    if (yPos > pageHeight - marginBottom) {
-      doc.addPage();
-      yPos = marginTop;
-    }
-    doc.text("Summary:", 20, yPos);
-    yPos += lineHeight;
+    doc.text("Summary", marginLeft, yPos);
+    yPos += lineHeight + 2;
     
+    doc.setFontSize(11);
     doc.setFont(undefined, "normal");
-    const summaryLines = doc.splitTextToSize(data.summary, 170);
+    const summaryWidth = pageWidth - marginLeft - marginRight;
+    const summaryLines = doc.splitTextToSize(data.summary, summaryWidth);
+    
     for (let i = 0; i < summaryLines.length; i++) {
-      if (yPos > pageHeight - marginBottom) {
-        doc.addPage();
-        yPos = marginTop;
-      }
-      doc.text(summaryLines[i], 20, yPos);
+      checkPageBreak(lineHeight);
+      doc.text(summaryLines[i], marginLeft, yPos);
       yPos += lineHeight;
     }
+    
+    // Add page number to last page
+    addPageNumber();
     
     doc.save("cornell-notes.pdf");
   };
 
   return (
-    <Card>
+    <Card data-testid="cornell-viewer">
       <CardHeader className="flex flex-row items-center justify-between">
         <CardTitle>Cornell Notes</CardTitle>
         <Button

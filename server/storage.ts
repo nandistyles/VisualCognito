@@ -47,11 +47,19 @@ export class MemStorage implements IStorage {
     return doc;
   }
 
-  async updateDocument(id: string, updates: Partial<Document>): Promise<Document | undefined> {
-    const doc = this.documents.get(id);
-    if (!doc) return undefined;
-    
-    const updated = { ...doc, ...updates };
+  async updateDocument(
+    id: string,
+    updates: Partial<Omit<Document, "id" | "uploadedAt">>
+  ): Promise<Document | undefined> {
+    const document = this.documents.get(id);
+    if (!document) return undefined;
+
+    const updated = {
+      ...document,
+      ...updates,
+      // Ensure errorMessage is cleared when status is not failed
+      ...(updates.status === "completed" ? { errorMessage: undefined } : {})
+    };
     this.documents.set(id, updated);
     return updated;
   }

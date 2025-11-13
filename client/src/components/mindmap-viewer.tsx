@@ -93,7 +93,7 @@ export default function MindmapViewer({ data }: MindmapViewerProps) {
   };
 
   return (
-    <Card className="relative">
+    <Card className="relative" data-testid="mindmap-viewer">
       <div className="absolute top-4 right-4 z-10">
         <Button
           onClick={handleExport}

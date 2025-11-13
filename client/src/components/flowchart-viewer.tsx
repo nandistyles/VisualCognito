@@ -36,7 +36,7 @@ export default function FlowchartViewer({ data }: FlowchartViewerProps) {
   }, []);
 
   return (
-    <Card className="relative">
+    <Card data-testid="flowchart-viewer">
       <div className="absolute top-4 right-4 z-10">
         <Button
           onClick={handleExport}

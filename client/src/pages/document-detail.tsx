@@ -22,10 +22,13 @@ export default function DocumentDetail() {
 
   const { data: visualizations, isLoading: isLoadingViz, refetch: refetchVisualizations } = useQuery<Visualization[]>({
     queryKey: [`/api/visualizations/${id}`],
-    enabled: !!document,
+    enabled: !!document && document.status !== "failed",
     refetchInterval: (query) => {
-      // Poll only if we have no data yet and the query was successful (not errored)
-      return (!query.state.data || query.state.data.length === 0) && query.state.status === 'success' ? 2000 : false;
+      // Only poll if document is processing and we don't have visualization data yet
+      const shouldPoll = document?.status === "processing" && 
+                        (!query.state.data || query.state.data.length === 0) && 
+                        query.state.status === 'success';
+      return shouldPoll ? 2000 : false;
     },
   });
 
@@ -96,13 +99,23 @@ export default function DocumentDetail() {
         </div>
 
         {document.status === "failed" ? (
-          <Card>
+          <Card data-testid="error-card">
             <CardContent className="py-24 text-center">
               <FileText className="w-16 h-16 text-destructive mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">Processing Failed</h3>
-              <p className="text-muted-foreground mb-6">
-                There was an error processing your document. Please try uploading it again.
+              <p className="text-muted-foreground mb-4">
+                {document.errorMessage || "There was an error processing your document. Please try uploading it again."}
               </p>
+              {document.errorMessage && document.errorMessage.includes("scanned") && (
+                <p className="text-sm text-muted-foreground mb-6 max-w-md mx-auto">
+                  <strong>Tip:</strong> If your PDF is a scanned document or contains images, try using a text-based PDF or convert it to text first.
+                </p>
+              )}
+              {!document.errorMessage?.includes("scanned") && (
+                <p className="text-sm text-muted-foreground mb-6">
+                  Please try uploading your document again.
+                </p>
+              )}
               <Link href="/">
                 <Button data-testid="button-try-again">
                   Upload New Document
@@ -115,8 +128,8 @@ export default function DocumentDetail() {
             <Loader2 className="w-12 h-12 animate-spin text-muted-foreground" />
           </div>
         ) : visualizations && visualizations.length > 0 ? (
-          <Tabs defaultValue={visualizations[0].type} className="w-full">
-            <TabsList>
+          <Tabs defaultValue={visualizations[0].type} className="w-full" data-testid="visualizations-tabs">
+            <TabsList data-testid="tabs-list">
               {flowchart && (
                 <TabsTrigger value="flowchart" data-testid="tab-flowchart">
                   <GitBranch className="w-4 h-4 mr-2" />

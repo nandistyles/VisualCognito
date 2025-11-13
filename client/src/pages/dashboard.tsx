@@ -48,17 +48,42 @@ export default function Dashboard() {
         description: "Your document is being processed.",
       });
 
-      // Poll for updates every 2 seconds
-      const pollInterval = setInterval(async () => {
+      // Poll for updates with robust error handling
+      const maxPollTime = 120000; // 2 minutes
+      const pollInterval = 2000;
+      const startTime = Date.now();
+      let pollAttempts = 0;
+      const maxConsecutiveErrors = 3;
+      let consecutiveErrors = 0;
+
+      const poll = setInterval(async () => {
+        // Check if we've exceeded max poll time
+        if (Date.now() - startTime > maxPollTime) {
+          clearInterval(poll);
+          toast({
+            title: "Processing timeout",
+            description: "Processing is taking longer than expected. Please check back later.",
+            variant: "destructive",
+          });
+          await queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+          return;
+        }
+
+        pollAttempts++;
+        
         try {
           const response = await fetch(`/api/documents/${data.id}`);
-          if (!response.ok) throw new Error("Failed to fetch document");
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+          }
+          
           const doc: Document = await response.json();
+          consecutiveErrors = 0; // Reset on success
           
           if (doc && (doc.status === "completed" || doc.status === "failed")) {
-            clearInterval(pollInterval);
+            clearInterval(poll);
             
-            // Invalidate all related queries and wait
+            // Invalidate all related queries
             await Promise.all([
               queryClient.invalidateQueries({ queryKey: ["/api/documents"] }),
               queryClient.invalidateQueries({ queryKey: [`/api/documents/${data.id}`] }),
@@ -70,23 +95,30 @@ export default function Dashboard() {
                 title: "Processing complete",
                 description: "Your visualization is ready!",
               });
-              // Navigate to document detail page after invalidation
               setTimeout(() => setLocation(`/document/${data.id}`), 100);
             } else {
               toast({
                 title: "Processing failed",
-                description: "There was an error processing your document. Please try again.",
+                description: doc.errorMessage || "There was an error processing your document. Please try again.",
                 variant: "destructive",
               });
             }
           }
         } catch (error) {
-          console.error("Error polling document:", error);
+          consecutiveErrors++;
+          console.error(`Polling error (attempt ${pollAttempts}, consecutive errors: ${consecutiveErrors}):`, error);
+          
+          if (consecutiveErrors >= maxConsecutiveErrors) {
+            clearInterval(poll);
+            toast({
+              title: "Connection error",
+              description: "Unable to check processing status. Please refresh the page.",
+              variant: "destructive",
+            });
+            await queryClient.invalidateQueries({ queryKey: ["/api/documents"] });
+          }
         }
-      }, 2000);
-
-      // Stop polling after 2 minutes
-      setTimeout(() => clearInterval(pollInterval), 120000);
+      }, pollInterval);
     },
     onError: () => {
       toast({
@@ -218,10 +250,11 @@ export default function Dashboard() {
                     disabled={uploadMutation.isPending}
                     className="w-full h-14"
                     data-testid="button-generate"
+                    data-status={uploadMutation.isPending ? "processing" : "idle"}
                   >
                     {uploadMutation.isPending ? (
                       <>
-                        <Loader2 className="w-5 h-5 mr-2 animate-spin" />
+                        <Loader2 className="w-5 h-5 mr-2 animate-spin" data-testid="loader-processing" />
                         Processing...
                       </>
                     ) : (

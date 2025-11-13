@@ -32,7 +32,7 @@ export const insertVisualizationSchema = createInsertSchema(visualizations).omit
 });
 
 export type InsertDocument = z.infer<typeof insertDocumentSchema>;
-export type Document = typeof documents.$inferSelect;
+export type Document = typeof documents.$inferSelect & { errorMessage?: string };
 export type InsertVisualization = z.infer<typeof insertVisualizationSchema>;
 export type Visualization = typeof visualizations.$inferSelect;
 

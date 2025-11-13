@@ -70,15 +70,42 @@ export async function registerRoutes(app: Express): Promise<Server> {
         status: "processing",
       });
 
-      // Process PDF asynchronously
+      // Process PDF asynchronously with timeout
       setImmediate(async () => {
+        const processingTimeout = setTimeout(async () => {
+          console.error("Processing timeout exceeded for document:", document.id);
+          try {
+            await storage.updateDocument(document.id, {
+              status: "failed",
+              errorMessage: "Processing timeout - the document took too long to process",
+            });
+          } catch (err) {
+            console.error("Error updating timeout status:", err);
+          }
+        }, 120000); // 2 minute timeout
+
         try {
           // Extract text from PDF
           const pdfData = await pdfParse(req.file!.buffer);
           const text = pdfData.text;
 
+          // Validate text extraction
           if (!text || text.trim().length === 0) {
-            throw new Error("PDF contains no extractable text");
+            throw new Error("PDF contains no extractable text. This might be a scanned document or image-based PDF.");
+          }
+
+          // Check if text is meaningful (not just gibberish or very short)
+          const trimmedText = text.trim();
+          const wordCount = trimmedText.split(/\s+/).length;
+          
+          if (wordCount < 10) {
+            throw new Error("PDF text is too short or not meaningful. Please ensure the PDF contains readable text content.");
+          }
+
+          // Check for common indicators of scanned/image PDFs
+          const nonPrintableRatio = (trimmedText.match(/[^\x20-\x7E\n\r\t]/g) || []).length / trimmedText.length;
+          if (nonPrintableRatio > 0.3) {
+            throw new Error("PDF appears to contain mostly non-text content. Please use a text-based PDF.");
           }
 
           // Update document with text content
@@ -88,16 +115,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
           // Generate visualization based on type
           let visualizationData;
-          switch (type) {
-            case "flowchart":
-              visualizationData = await generateFlowchart(text);
-              break;
-            case "mindmap":
-              visualizationData = await generateMindmap(text);
-              break;
-            case "cornell":
-              visualizationData = await generateCornellNotes(text);
-              break;
+          try {
+            switch (type) {
+              case "flowchart":
+                visualizationData = await generateFlowchart(text);
+                break;
+              case "mindmap":
+                visualizationData = await generateMindmap(text);
+                break;
+              case "cornell":
+                visualizationData = await generateCornellNotes(text);
+                break;
+            }
+          } catch (aiError) {
+            const errorMessage = aiError instanceof Error ? aiError.message : "Unknown AI error";
+            throw new Error(`AI generation failed: ${errorMessage}`);
           }
 
           // Store visualization
@@ -111,12 +143,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
           await storage.updateDocument(document.id, {
             status: "completed",
           });
+
+          clearTimeout(processingTimeout);
         } catch (error) {
-          console.error("Error processing document:", error);
-          // Ensure status is updated to failed on any error
+          clearTimeout(processingTimeout);
+          
+          const errorMessage = error instanceof Error ? error.message : "Unknown error occurred";
+          console.error("Error processing document:", errorMessage, error);
+          
+          // Provide detailed error feedback
           try {
             await storage.updateDocument(document.id, {
               status: "failed",
+              errorMessage,
             });
           } catch (updateError) {
             console.error("Error updating document status to failed:", updateError);
