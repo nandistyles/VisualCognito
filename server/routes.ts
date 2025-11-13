@@ -1,10 +1,14 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import pdfParse from "pdf-parse";
 import { storage } from "./storage";
 import { generateFlowchart, generateMindmap, generateCornellNotes } from "./openai";
 import type { VisualizationType } from "@shared/schema";
+
+// Import pdf-parse as CommonJS module
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const pdfParse = require("pdf-parse");
 
 const upload = multer({ storage: multer.memoryStorage() });
 
