@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import multer from "multer";
-import * as pdfParse from "pdf-parse";
+import pdfParse from "pdf-parse";
 import { storage } from "./storage";
 import { generateFlowchart, generateMindmap, generateCornellNotes } from "./openai";
 import type { VisualizationType } from "@shared/schema";
